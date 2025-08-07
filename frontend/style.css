@@ -1,0 +1,324 @@
+:root {
+    --bg-color: #1b2636;
+    --card-color: #2a3950;
+    --text-color: #e0e0e0;
+    --primary-color: #4a90e2;
+    --primary-hover: #5aa1f2;
+    --border-color: #405068;
+    --success-color: #2ecc71;
+    --error-color: #e74c3c;
+    --delete-color: #c0392b;
+    --delete-hover: #e74c3c;
+    --inspect-color: #3498db;
+    --inspect-hover: #5dade2;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+    margin: 0;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.container {
+    max-width: 680px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+h1, h2, h3 {
+    margin: 0 0 15px 0;
+    font-weight: 500;
+}
+
+h1 {
+    text-align: center;
+    color: var(--primary-color);
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    margin-top: 10px;
+    font-size: 14px;
+    color: #a0b0c0;
+}
+
+.card {
+    background-color: var(--card-color);
+    border-radius: 8px;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.card-inset {
+    margin-top: 15px;
+    padding: 15px;
+    background-color: var(--bg-color);
+}
+
+input[type="text"],
+input[type="number"],
+select {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    color: var(--text-color);
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.3);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.full-width {
+    grid-column: 1 / -1;
+}
+
+button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+    margin-right: 10px;
+    margin-top: 5px;
+    vertical-align: middle;
+}
+
+button:hover {
+    background-color: var(--primary-hover);
+}
+
+button:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+}
+
+.btn-delete {
+    background-color: var(--delete-color);
+    min-width: 40px;
+}
+.btn-delete:hover {
+    background-color: var(--delete-hover);
+}
+
+.btn-inspect {
+    background-color: var(--inspect-color);
+}
+.btn-inspect:hover {
+    background-color: var(--inspect-hover);
+}
+
+
+.select-with-button {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.select-with-button select {
+    flex-grow: 1;
+    margin-bottom: 0;
+}
+
+#cert-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0 0 15px 0;
+    max-height: 150px;
+    overflow-y: auto;
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 10px;
+}
+
+#cert-list li {
+    padding: 8px 5px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+#cert-list li:last-child {
+    border-bottom: none;
+}
+#cert-list .cert-name {
+    flex-grow: 1;
+    word-break: break-all;
+}
+#cert-list .cert-actions {
+    display: flex;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+
+details > summary {
+    cursor: pointer;
+    font-size: 1.25rem;
+    font-weight: 500;
+    padding: 10px;
+    background-color: var(--card-color);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+details.log-details > summary {
+    font-size: 1rem;
+    text-align: center;
+    background-color: transparent;
+    border: none;
+    color: var(--primary-color);
+}
+
+
+.log-container {
+    background-color: #121a26;
+    border-radius: 8px;
+    padding: 15px;
+    border: 1px solid var(--border-color);
+    margin-top: 10px;
+}
+
+#log-output {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 0;
+    max-height: 200px;
+    overflow-y: auto;
+    color: #b0b0b0;
+}
+
+#log-output .success {
+    color: var(--success-color);
+}
+
+#log-output .error {
+    color: var(--error-color);
+}
+
+/* --- Toast Notification Styles --- */
+#toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    z-index: 1000;
+}
+
+.toast {
+    color: white;
+    padding: 15px 20px;
+    border-radius: 5px;
+    margin-top: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    opacity: 0;
+    transform: translateX(100%);
+    animation: slideIn 0.5s forwards, fadeOut 0.5s 4.5s forwards;
+}
+
+.toast.success {
+    background-color: var(--success-color);
+}
+
+.toast.error {
+    background-color: var(--error-color);
+}
+
+@keyframes slideIn {
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes fadeOut {
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+/* --- Modal Styles --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.modal-content {
+    background-color: var(--card-color);
+    padding: 25px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    position: relative;
+    border: 1px solid var(--border-color);
+}
+
+.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #aaa;
+}
+.modal-close:hover {
+    color: white;
+}
+
+#modal-body p {
+    margin: 0 0 10px 0;
+    line-height: 1.6;
+}
+#modal-body strong {
+    color: var(--primary-color);
+}
+
+/* --- Footer Styles --- */
+#app-footer {
+    text-align: center;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+    color: #8899a6;
+    font-size: 12px;
+}

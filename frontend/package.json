@@ -1,0 +1,10 @@
+{
+  "name": "ca-manager-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for the CA Manager application.",
+  "scripts": {
+    "build": "echo 'No build step required'"
+  },
+  "author": "",
+  "license": "ISC"
+}
