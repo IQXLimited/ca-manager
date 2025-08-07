@@ -29,6 +29,7 @@ export namespace main {
 	    validUntil: string;
 	    serialNumber: string;
 	    ipAddresses: string[];
+	    dnsNames: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new CertDetails(source);
@@ -42,6 +43,7 @@ export namespace main {
 	        this.validUntil = source["validUntil"];
 	        this.serialNumber = source["serialNumber"];
 	        this.ipAddresses = source["ipAddresses"];
+	        this.dnsNames = source["dnsNames"];
 	    }
 	}
 

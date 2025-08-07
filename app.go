@@ -48,14 +48,14 @@ type CAInput struct {
 
 // CertDetails holds the inspected information for a certificate.
 type CertDetails struct {
-	Subject      string `json:"subject"`
-	Issuer       string `json:"issuer"`
-	ValidFrom    string `json:"validFrom"`
-	ValidUntil   string `json:"validUntil"`
-	SerialNumber string `json:"serialNumber"`
+	Subject      string   `json:"subject"`
+	Issuer       string   `json:"issuer"`
+	ValidFrom    string   `json:"validFrom"`
+	ValidUntil   string   `json:"validUntil"`
+	SerialNumber string   `json:"serialNumber"`
 	IPAddresses  []string `json:"ipAddresses"`
+	DNSNames     []string `json:"dnsNames"`
 }
-
 
 // ListCAs scans the output directory for CA files.
 func (a *App) ListCAs() []string {
@@ -139,16 +139,15 @@ func (a *App) CreateCA(input CAInput) string {
 }
 
 // CreateCert generates a server/device certificate signed by a chosen CA.
-func (a *App) CreateCert(ipStr string, caName string, expiryDays int) string {
+func (a *App) CreateCert(hostnameOrIP string, caName string, expiryDays int) string {
 	if caName == "" {
 		return "Error: You must select a CA to sign the certificate with."
 	}
 	if expiryDays <= 0 {
 		expiryDays = 730 // Default to 2 years
 	}
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return fmt.Sprintf("Error: '%s' is not a valid IP address.", ipStr)
+	if hostnameOrIP == "" {
+		return "Error: Hostname or IP address cannot be empty."
 	}
 
 	caKeyPath := filepath.Join(outputDir, fmt.Sprintf("%s.key", caName))
@@ -180,12 +179,19 @@ func (a *App) CreateCert(ipStr string, caName string, expiryDays int) string {
 
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(time.Now().Unix()),
-		Subject:      pkix.Name{CommonName: ipStr},
-		IPAddresses:  []net.IP{ip},
+		Subject:      pkix.Name{CommonName: hostnameOrIP},
 		NotBefore:    time.Now(),
 		NotAfter:     time.Now().AddDate(0, 0, expiryDays),
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:     x509.KeyUsageDigitalSignature,
+	}
+
+	// Check if the input is an IP address or a DNS name
+	ip := net.ParseIP(hostnameOrIP)
+	if ip != nil {
+		template.IPAddresses = []net.IP{ip}
+	} else {
+		template.DNSNames = []string{hostnameOrIP}
 	}
 
 	deviceKey, err := rsa.GenerateKey(rand.Reader, rsaBitsSrv)
@@ -198,8 +204,10 @@ func (a *App) CreateCert(ipStr string, caName string, expiryDays int) string {
 		return fmt.Sprintf("Error signing device cert: %v", err)
 	}
 
-	deviceCertFile := filepath.Join(outputDir, fmt.Sprintf("%s_signed-by_%s.pem", ipStr, caName))
-	deviceKeyFile := filepath.Join(outputDir, fmt.Sprintf("%s_signed-by_%s.key", ipStr, caName))
+	// Sanitize filename for hostnames
+	safeFilename := strings.ReplaceAll(hostnameOrIP, "*", "_wildcard")
+	deviceCertFile := filepath.Join(outputDir, fmt.Sprintf("%s_signed-by_%s.pem", safeFilename, caName))
+	deviceKeyFile := filepath.Join(outputDir, fmt.Sprintf("%s_signed-by_%s.key", safeFilename, caName))
 
 	certOut, err := os.Create(deviceCertFile)
 	if err != nil {
@@ -215,7 +223,7 @@ func (a *App) CreateCert(ipStr string, caName string, expiryDays int) string {
 	pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(deviceKey)})
 	keyOut.Close()
 
-	return fmt.Sprintf("Success! Certificate for %s created in the 'output' folder.", ipStr)
+	return fmt.Sprintf("Success! Certificate for %s created in the 'output' folder.", hostnameOrIP)
 }
 
 // ListCerts scans the output directory and returns a list of generated device .pem files.
@@ -301,11 +309,11 @@ func (a *App) InspectCert(certName string) (*CertDetails, error) {
 		ValidUntil:   cert.NotAfter.Format(time.RFC1123),
 		SerialNumber: cert.SerialNumber.String(),
 		IPAddresses:  ips,
+		DNSNames:     cert.DNSNames,
 	}
 
 	return details, nil
 }
-
 
 // Helper function to check if a file exists.
 func fileExists(filename string) bool {

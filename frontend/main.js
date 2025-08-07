@@ -17,7 +17,7 @@ const caExpiry = document.getElementById('ca-expiry');
 // Create Device Cert section
 const btnCreateCert = document.getElementById('btn-create-cert');
 const caSelectorDevice = document.getElementById('ca-selector-device');
-const certIp = document.getElementById('cert-ip');
+const certHostname = document.getElementById('cert-hostname');
 const deviceExpiry = document.getElementById('device-expiry');
 const btnDeleteCaDevice = document.getElementById('btn-delete-ca-device');
 
@@ -72,12 +72,12 @@ btnCreateCA.addEventListener('click', () => {
 
 // Create Certificate button
 btnCreateCert.addEventListener('click', () => {
-    const ip = certIp.value;
+    const hostnameOrIP = certHostname.value;
     const selectedCA = caSelectorDevice.value;
     const expiry = parseInt(deviceExpiry.value) * 365;
 
-    if (!ip) {
-        showToast("Please enter an IP address.", "error");
+    if (!hostnameOrIP) {
+        showToast("Please enter a hostname or IP address.", "error");
         return;
     }
     if (!selectedCA) {
@@ -85,8 +85,16 @@ btnCreateCert.addEventListener('click', () => {
         return;
     }
 
-    logMessage(`Creating certificate for ${ip}...`);
-    window.go.main.App.CreateCert(ip, selectedCA, expiry).then(handleResult).then(refreshCertList);
+    logMessage(`Creating certificate for ${hostnameOrIP}...`);
+    window.go.main.App.CreateCert(hostnameOrIP, selectedCA, expiry)
+        .then(result => {
+            handleResult(result);
+            // If the creation was successful, clear the input field
+            if (result && result.toLowerCase().startsWith("success")) {
+                certHostname.value = '';
+            }
+        })
+        .then(refreshCertList);
 });
 
 // Install CA button
@@ -126,10 +134,18 @@ function setCopyright() {
 function inspectCert(certName) {
     logMessage(`Inspecting certificate '${certName}'...`);
     window.go.main.App.InspectCert(certName).then(details => {
+        let addresses = '';
+        if (details.ipAddresses && details.ipAddresses.length > 0) {
+            addresses += `<p><strong>IP Addresses:</strong> ${details.ipAddresses.join(', ')}</p>`;
+        }
+        if (details.dnsNames && details.dnsNames.length > 0) {
+            addresses += `<p><strong>DNS Names:</strong> ${details.dnsNames.join(', ')}</p>`;
+        }
+
         modalBody.innerHTML = `
             <p><strong>Subject:</strong> ${details.subject}</p>
             <p><strong>Issuer:</strong> ${details.issuer}</p>
-            <p><strong>IP Addresses:</strong> ${details.ipAddresses.join(', ')}</p>
+            ${addresses}
             <p><strong>Valid From:</strong> ${details.validFrom}</p>
             <p><strong>Valid Until:</strong> ${details.validUntil}</p>
             <p><strong>Serial Number:</strong> ${details.serialNumber}</p>
@@ -279,6 +295,7 @@ function handleResult(result) {
             showToast(result, "error");
         }
     }
+    return result; // Pass the result along the promise chain
 }
 
 // showToast creates and displays a toast notification.
