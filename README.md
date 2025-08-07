@@ -22,7 +22,7 @@ To build this application from source, you will need the following installed on 
 2. **Wails CLI:** The command-line tool for Wails. Install it by running:
 
     ```bash
-    go install [github.com/wailsapp/wails/v2/cmd/wails@latest](https://github.com/wailsapp/wails/v2/cmd/wails@latest)
+    go install https://github.com/wailsapp/wails/v2/cmd/wails@latest
     ```
 
 3. **System Dependencies:** Wails may require additional system libraries (like a C compiler). Run `wails doctor` to check if your system is ready.
@@ -32,7 +32,7 @@ To build this application from source, you will need the following installed on 
 1. Clone the repository:
 
     ```bash
-    git clone [https://github.com/gareth-johnstone/ca-manager.git](https://github.com/gareth-johnstone/ca-manager.git)
+    git clone https://github.com/gareth-johnstone/ca-manager.git
     ```
 
 2. Navigate into the project directory:
