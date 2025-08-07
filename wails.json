@@ -9,5 +9,12 @@
   "author": {
     "name": "Gareth Johnstone",
     "email": "gareth.johnstone@iqx.co.uk"
+  },
+  "info": {
+  "companyName": "IQX Limited",
+  "productName": "IQX CA Manager",
+  "productVersion": "2025.08.07",
+  "copyright": "Copyright © 2025 IQX Limited",
+  "comments": "A tool for managing local Certificate Authorities."
   }
 }
