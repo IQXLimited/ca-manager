@@ -1,10 +1,11 @@
 module ca-manager
 
-go 1.23
+go 1.24.6
 
 require (
 	github.com/wailsapp/wails/v2 v2.10.2
-	golang.org/x/sys v0.30.0
+	golang.org/x/sys v0.35.0
+	software.sslmate.com/src/go-pkcs12 v0.6.0
 )
 
 require (
@@ -35,5 +36,3 @@ require (
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 )
-
-// replace github.com/wailsapp/wails/v2 v2.10.2 => C:\Users\Gareth\go\pkg\mod

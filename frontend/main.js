@@ -26,6 +26,7 @@ const installCaSection = document.getElementById('install-ca-section');
 const btnInstallCA = document.getElementById('btn-install-ca');
 const caSelectorInstall = document.getElementById('ca-selector-install');
 const btnDeleteCaInstall = document.getElementById('btn-delete-ca-install');
+const btnGenerateInstaller = document.getElementById('btn-generate-installer');
 
 
 // Generated Certs section
@@ -89,7 +90,6 @@ btnCreateCert.addEventListener('click', () => {
     window.go.main.App.CreateCert(hostnameOrIP, selectedCA, expiry)
         .then(result => {
             handleResult(result);
-            // If the creation was successful, clear the input field
             if (result && result.toLowerCase().startsWith("success")) {
                 certHostname.value = '';
             }
@@ -107,6 +107,18 @@ btnInstallCA.addEventListener('click', () => {
     logMessage(`Attempting to install CA '${selectedCA}' into Windows trust store...`);
     window.go.main.App.InstallCA(selectedCA).then(handleResult);
 });
+
+// Generate Installer button
+btnGenerateInstaller.addEventListener('click', () => {
+    const selectedCA = caSelectorInstall.value;
+    if (!selectedCA) {
+        showToast("Please select a CA to generate an installer for.", "error");
+        return;
+    }
+    logMessage(`Generating installer for CA '${selectedCA}'...`);
+    window.go.main.App.GenerateInstaller(selectedCA).then(handleResult);
+});
+
 
 // Refresh device certificate list button
 btnRefreshCerts.addEventListener('click', refreshCertList);
@@ -177,6 +189,20 @@ function deleteCert(certName) {
         window.go.main.App.DeleteCert(certName).then(handleResult).then(refreshCertList);
     }
 }
+
+function exportPfx(certName) {
+    if (!certName) {
+        showToast("Cannot determine certificate to export.", "error");
+        return;
+    }
+    const password = prompt("Please enter a password for the PFX file. Leave blank for no password.");
+    if (password === null) { // User clicked cancel
+        return;
+    }
+    logMessage(`Exporting '${certName}' to PFX...`);
+    window.go.main.App.ExportToPFX(certName, password).then(handleResult);
+}
+
 
 // checkAdminStatus checks if running as admin and updates UI.
 function checkAdminStatus() {
@@ -261,6 +287,11 @@ function refreshCertList() {
                 inspectBtn.className = 'btn-inspect';
                 inspectBtn.onclick = () => inspectCert(certName);
 
+                const exportBtn = document.createElement('button');
+                exportBtn.textContent = 'Export PFX';
+                exportBtn.className = 'btn-secondary';
+                exportBtn.onclick = () => exportPfx(certName);
+
                 const deleteBtn = document.createElement('button');
                 deleteBtn.textContent = 'X';
                 deleteBtn.className = 'btn-delete';
@@ -268,6 +299,7 @@ function refreshCertList() {
                 deleteBtn.onclick = () => deleteCert(certName);
 
                 actionsDiv.appendChild(inspectBtn);
+                actionsDiv.appendChild(exportBtn);
                 actionsDiv.appendChild(deleteBtn);
                 li.appendChild(span);
                 li.appendChild(actionsDiv);

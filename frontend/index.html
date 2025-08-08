@@ -34,7 +34,7 @@
             <button class="btn-delete" id="btn-delete-ca-device" title="Delete selected CA">X</button>
         </div>
         <label for="cert-hostname">Device Hostname or IP Address:</label>
-        <input id="cert-hostname" placeholder="e.g., my-server or 192.168.1.50" type="text">
+        <input id="cert-hostname" placeholder="e.g., my-server, *.my-domain.local, or 192.168.1.50" type="text">
         <label for="device-expiry">Expiry in Years:</label>
         <select id="device-expiry"></select>
         <button id="btn-create-cert">Create Certificate</button>
@@ -48,6 +48,7 @@
              <button class="btn-delete" id="btn-delete-ca-install" title="Delete selected CA">X</button>
         </div>
         <button id="btn-install-ca">Install Selected CA (Admin)</button>
+        <button id="btn-generate-installer" class="btn-secondary">Generate Installer</button>
     </div>
 
     <div class="card">
@@ -55,7 +56,7 @@
         <ul id="cert-list">
             <li>No certificates found.</li>
         </ul>
-        <button id="btn-refresh-certs">Refresh List</button>
+        <button id="btn-refresh-certs" class="btn-secondary">Refresh List</button>
     </div>
 
     <details class="log-details">

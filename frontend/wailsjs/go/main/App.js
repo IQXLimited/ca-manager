@@ -18,6 +18,14 @@ export function DeleteCert(arg1) {
   return window['go']['main']['App']['DeleteCert'](arg1);
 }
 
+export function ExportToPFX(arg1, arg2) {
+  return window['go']['main']['App']['ExportToPFX'](arg1, arg2);
+}
+
+export function GenerateInstaller(arg1) {
+  return window['go']['main']['App']['GenerateInstaller'](arg1);
+}
+
 export function InspectCert(arg1) {
   return window['go']['main']['App']['InspectCert'](arg1);
 }

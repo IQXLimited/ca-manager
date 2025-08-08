@@ -132,7 +132,6 @@ button:disabled {
     background-color: var(--inspect-hover);
 }
 
-
 .select-with-button {
     display: flex;
     gap: 10px;

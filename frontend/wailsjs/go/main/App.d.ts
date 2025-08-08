@@ -10,6 +10,10 @@ export function DeleteCA(arg1:string):Promise<string>;
 
 export function DeleteCert(arg1:string):Promise<string>;
 
+export function ExportToPFX(arg1:string,arg2:string):Promise<string>;
+
+export function GenerateInstaller(arg1:string):Promise<string>;
+
 export function InspectCert(arg1:string):Promise<main.CertDetails>;
 
 export function InstallCA(arg1:string):Promise<string>;
