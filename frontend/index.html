@@ -33,8 +33,16 @@
             <select id="ca-selector-device"></select>
             <button class="btn-delete" id="btn-delete-ca-device" title="Delete selected CA">X</button>
         </div>
-        <label for="cert-hostname">Device Hostname or IP Address:</label>
-        <input id="cert-hostname" placeholder="e.g., my-server, *.my-domain.local, or 192.168.1.50" type="text">
+        
+        <label for="cert-cn">Common Name (CN):</label>
+        <input id="cert-cn" placeholder="e.g., my-server, *.my-domain.local, or 192.168.1.50" type="text">
+
+        <label for="cert-sans-input">Additional Names (SANs):</label>
+        <div class="sans-container" id="sans-container">
+            <!-- Pills will be added here by JavaScript -->
+            <input id="cert-sans-input" placeholder="Type a name and press Enter, Tab, or Comma..." type="text">
+        </div>
+
         <label for="device-expiry">Expiry in Years:</label>
         <select id="device-expiry"></select>
         <button id="btn-create-cert">Create Certificate</button>

@@ -141,16 +141,38 @@ func (a *App) CreateCA(input CAInput) string {
 	return fmt.Sprintf("Success! CA '%s' created in the 'output' folder.", input.CommonName)
 }
 
-// CreateCert generates a server/device certificate signed by a chosen CA.
-func (a *App) CreateCert(hostnameOrIP string, caName string, expiryDays int) string {
+// CreateCert generates a server/device certificate with a CN and SANs, signed by a chosen CA.
+func (a *App) CreateCert(cn string, sans string, caName string, expiryDays int) string {
 	if caName == "" {
 		return "Error: You must select a CA to sign the certificate with."
 	}
 	if expiryDays <= 0 {
 		expiryDays = 730 // Default to 2 years
 	}
-	if hostnameOrIP == "" {
-		return "Error: Hostname or IP address cannot be empty."
+	if cn == "" {
+		return "Error: Common Name (CN) cannot be empty."
+	}
+
+	// The full list of SANs must include the CN
+	allSans := []string{cn}
+	if sans != "" {
+		sanList := strings.Split(sans, ",")
+		for _, s := range sanList {
+			trimmed := strings.TrimSpace(s)
+			if trimmed != "" {
+				// Avoid duplicates
+				isDuplicate := false
+				for _, existingSan := range allSans {
+					if existingSan == trimmed {
+						isDuplicate = true
+						break
+					}
+				}
+				if !isDuplicate {
+					allSans = append(allSans, trimmed)
+				}
+			}
+		}
 	}
 
 	caCert, caPrivateKey, err := loadCA(caName)
@@ -160,18 +182,20 @@ func (a *App) CreateCert(hostnameOrIP string, caName string, expiryDays int) str
 
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(time.Now().Unix()),
-		Subject:      pkix.Name{CommonName: hostnameOrIP},
+		Subject:      pkix.Name{CommonName: cn},
 		NotBefore:    time.Now(),
 		NotAfter:     time.Now().AddDate(0, 0, expiryDays),
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 	}
 
-	ip := net.ParseIP(hostnameOrIP)
-	if ip != nil {
-		template.IPAddresses = []net.IP{ip}
-	} else {
-		template.DNSNames = []string{hostnameOrIP}
+	for _, san := range allSans {
+		ip := net.ParseIP(san)
+		if ip != nil {
+			template.IPAddresses = append(template.IPAddresses, ip)
+		} else {
+			template.DNSNames = append(template.DNSNames, san)
+		}
 	}
 
 	deviceKey, err := rsa.GenerateKey(rand.Reader, rsaBitsSrv)
@@ -184,7 +208,7 @@ func (a *App) CreateCert(hostnameOrIP string, caName string, expiryDays int) str
 		return fmt.Sprintf("Error signing device cert: %v", err)
 	}
 
-	safeFilename := strings.ReplaceAll(hostnameOrIP, "*", "_wildcard")
+	safeFilename := strings.ReplaceAll(cn, "*", "_wildcard")
 	deviceCertFile := filepath.Join(outputDir, fmt.Sprintf("%s_signed-by_%s.pem", safeFilename, caName))
 	deviceKeyFile := filepath.Join(outputDir, fmt.Sprintf("%s_signed-by_%s.key", safeFilename, caName))
 
@@ -202,7 +226,7 @@ func (a *App) CreateCert(hostnameOrIP string, caName string, expiryDays int) str
 	pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(deviceKey)})
 	keyOut.Close()
 
-	return fmt.Sprintf("Success! Certificate for %s created.", hostnameOrIP)
+	return fmt.Sprintf("Success! Certificate for %s created.", cn)
 }
 
 // ListCerts scans the output directory and returns a list of generated device .pem files.

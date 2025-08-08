@@ -17,9 +17,12 @@ const caExpiry = document.getElementById('ca-expiry');
 // Create Device Cert section
 const btnCreateCert = document.getElementById('btn-create-cert');
 const caSelectorDevice = document.getElementById('ca-selector-device');
-const certHostname = document.getElementById('cert-hostname');
+const certCn = document.getElementById('cert-cn');
 const deviceExpiry = document.getElementById('device-expiry');
 const btnDeleteCaDevice = document.getElementById('btn-delete-ca-device');
+const sansContainer = document.getElementById('sans-container');
+const certSansInput = document.getElementById('cert-sans-input');
+
 
 // Install CA section
 const installCaSection = document.getElementById('install-ca-section');
@@ -51,6 +54,7 @@ window.addEventListener('load', () => {
     refreshCAList();
     refreshCertList();
     setCopyright();
+    setupSanInput();
 });
 
 // Create CA button
@@ -73,12 +77,17 @@ btnCreateCA.addEventListener('click', () => {
 
 // Create Certificate button
 btnCreateCert.addEventListener('click', () => {
-    const hostnameOrIP = certHostname.value;
+    const cn = certCn.value;
     const selectedCA = caSelectorDevice.value;
     const expiry = parseInt(deviceExpiry.value) * 365;
 
-    if (!hostnameOrIP) {
-        showToast("Please enter a hostname or IP address.", "error");
+    // Collect SANs from the pills
+    const sans = Array.from(sansContainer.querySelectorAll('.san-pill span'))
+                      .map(span => span.textContent)
+                      .join(',');
+
+    if (!cn) {
+        showToast("Please enter a Common Name (CN).", "error");
         return;
     }
     if (!selectedCA) {
@@ -86,12 +95,13 @@ btnCreateCert.addEventListener('click', () => {
         return;
     }
 
-    logMessage(`Creating certificate for ${hostnameOrIP}...`);
-    window.go.main.App.CreateCert(hostnameOrIP, selectedCA, expiry)
+    logMessage(`Creating certificate for ${cn}...`);
+    window.go.main.App.CreateCert(cn, sans, selectedCA, expiry)
         .then(result => {
             handleResult(result);
             if (result && result.toLowerCase().startsWith("success")) {
-                certHostname.value = '';
+                certCn.value = '';
+                sansContainer.querySelectorAll('.san-pill').forEach(pill => pill.remove());
             }
         })
         .then(refreshCertList);
@@ -138,6 +148,50 @@ inspectModal.addEventListener('click', (e) => {
 
 // --- Helper Functions ---
 
+function setupSanInput() {
+    certSansInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ',' || e.key === 'Tab') {
+            e.preventDefault();
+            const value = certSansInput.value.trim();
+            if (value) {
+                createSanPill(value);
+                certSansInput.value = '';
+            }
+        }
+    });
+    // Add pill on paste
+    certSansInput.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const pasteData = (e.clipboardData || window.clipboardData).getData('text');
+        const values = pasteData.split(/[\s,]+/);
+        values.forEach(value => {
+            const trimmed = value.trim();
+            if (trimmed) {
+                createSanPill(trimmed);
+            }
+        });
+    });
+}
+
+function createSanPill(text) {
+    const pill = document.createElement('div');
+    pill.className = 'san-pill';
+
+    const span = document.createElement('span');
+    span.textContent = text;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.innerHTML = '&times;';
+    removeBtn.onclick = () => pill.remove();
+
+    pill.appendChild(span);
+    pill.appendChild(removeBtn);
+
+    // Insert the pill before the input field
+    sansContainer.insertBefore(pill, certSansInput);
+}
+
+
 function setCopyright() {
     const currentYear = new Date().getFullYear();
     appFooter.textContent = `© ${currentYear} IQX Limited. All rights reserved.`;
@@ -151,11 +205,11 @@ function inspectCert(certName) {
             addresses += `<p><strong>IP Addresses:</strong> ${details.ipAddresses.join(', ')}</p>`;
         }
         if (details.dnsNames && details.dnsNames.length > 0) {
-            addresses += `<p><strong>DNS Names:</strong> ${details.dnsNames.join(', ')}</p>`;
+            addresses += `<p><strong>DNS Names (SANs):</strong> ${details.dnsNames.join(', ')}</p>`;
         }
 
         modalBody.innerHTML = `
-            <p><strong>Subject:</strong> ${details.subject}</p>
+            <p><strong>Subject (CN):</strong> ${details.subject}</p>
             <p><strong>Issuer:</strong> ${details.issuer}</p>
             ${addresses}
             <p><strong>Valid From:</strong> ${details.validFrom}</p>
@@ -269,51 +323,60 @@ function refreshCAList() {
 // refreshCertList calls the Go backend to get the list of device certs and updates the UI
 function refreshCertList() {
     logMessage("Refreshing device certificate list...");
-    window.go.main.App.ListCerts().then(certs => {
-        certList.innerHTML = ''; // Clear the list
-        if (certs && certs.length > 0) {
-            certs.forEach(certName => {
+    window.go.main.App.ListCAs().then(cas => { // We need the list of CAs to enable/disable the export button
+        window.go.main.App.ListCerts().then(certs => {
+            certList.innerHTML = ''; // Clear the list
+            if (certs && certs.length > 0) {
+                certs.forEach(certName => {
+                    const li = document.createElement('li');
+                    
+                    const span = document.createElement('span');
+                    span.textContent = certName;
+                    span.className = 'cert-name';
+                    
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'cert-actions';
+
+                    const inspectBtn = document.createElement('button');
+                    inspectBtn.textContent = 'Inspect';
+                    inspectBtn.className = 'btn-inspect';
+                    inspectBtn.onclick = () => inspectCert(certName);
+
+                    const exportBtn = document.createElement('button');
+                    exportBtn.textContent = 'Export PFX';
+                    exportBtn.className = 'btn-secondary';
+                    exportBtn.onclick = () => exportPfx(certName);
+                    // Disable export if the issuing CA doesn't exist anymore
+                    const issuerName = certName.split('_signed-by_')[1].replace('.pem', '');
+                    if (!cas.includes(issuerName)) {
+                        exportBtn.disabled = true;
+                        exportBtn.title = `Issuing CA '${issuerName}' not found.`;
+                    }
+
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = 'X';
+                    deleteBtn.className = 'btn-delete';
+                    deleteBtn.title = `Delete ${certName}`;
+                    deleteBtn.onclick = () => deleteCert(certName);
+
+                    actionsDiv.appendChild(inspectBtn);
+                    actionsDiv.appendChild(exportBtn);
+                    actionsDiv.appendChild(deleteBtn);
+                    li.appendChild(span);
+                    li.appendChild(actionsDiv);
+                    certList.appendChild(li);
+                });
+                 logMessage("Device certificate list updated.");
+            } else {
                 const li = document.createElement('li');
-                
-                const span = document.createElement('span');
-                span.textContent = certName;
-                span.className = 'cert-name';
-                
-                const actionsDiv = document.createElement('div');
-                actionsDiv.className = 'cert-actions';
-
-                const inspectBtn = document.createElement('button');
-                inspectBtn.textContent = 'Inspect';
-                inspectBtn.className = 'btn-inspect';
-                inspectBtn.onclick = () => inspectCert(certName);
-
-                const exportBtn = document.createElement('button');
-                exportBtn.textContent = 'Export PFX';
-                exportBtn.className = 'btn-secondary';
-                exportBtn.onclick = () => exportPfx(certName);
-
-                const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = 'X';
-                deleteBtn.className = 'btn-delete';
-                deleteBtn.title = `Delete ${certName}`;
-                deleteBtn.onclick = () => deleteCert(certName);
-
-                actionsDiv.appendChild(inspectBtn);
-                actionsDiv.appendChild(exportBtn);
-                actionsDiv.appendChild(deleteBtn);
-                li.appendChild(span);
-                li.appendChild(actionsDiv);
+                li.textContent = 'No device certificates found in output folder.';
                 certList.appendChild(li);
-            });
-             logMessage("Device certificate list updated.");
-        } else {
-            const li = document.createElement('li');
-            li.textContent = 'No device certificates found in output folder.';
-            certList.appendChild(li);
-            logMessage("No device certificates found.");
-        }
-    }).catch(err => {
-        logMessage(`Error refreshing list: ${err}`, "error");
+                logMessage("No device certificates found.");
+            }
+        }).catch(err => {
+            logMessage(`Error refreshing list: ${err}`, "error");
+        });
     });
 }
 

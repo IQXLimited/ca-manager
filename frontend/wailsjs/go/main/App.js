@@ -6,8 +6,8 @@ export function CreateCA(arg1) {
   return window['go']['main']['App']['CreateCA'](arg1);
 }
 
-export function CreateCert(arg1, arg2, arg3) {
-  return window['go']['main']['App']['CreateCert'](arg1, arg2, arg3);
+export function CreateCert(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CreateCert'](arg1, arg2, arg3, arg4);
 }
 
 export function DeleteCA(arg1) {
