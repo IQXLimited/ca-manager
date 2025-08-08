@@ -27,7 +27,7 @@ func main() {
 	err := wails.Run(&options.App{
 		Title:  "IQX CA Manager",
 		Width:  720,
-		Height: 900, // Increased height for footer
+		Height: 900,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

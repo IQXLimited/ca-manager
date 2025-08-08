@@ -4,11 +4,15 @@ import {main} from '../models';
 
 export function CreateCA(arg1:main.CAInput):Promise<string>;
 
-export function CreateCert(arg1:string,arg2:string,arg3:number):Promise<string>;
+export function CreateCert(arg1:string,arg2:string,arg3:string,arg4:number):Promise<string>;
 
 export function DeleteCA(arg1:string):Promise<string>;
 
 export function DeleteCert(arg1:string):Promise<string>;
+
+export function ExportToPFX(arg1:string,arg2:string):Promise<string>;
+
+export function GenerateInstaller(arg1:string):Promise<string>;
 
 export function InspectCert(arg1:string):Promise<main.CertDetails>;
 
