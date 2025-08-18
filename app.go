@@ -379,7 +379,7 @@ net session >nul 2>&1
 if %errorLevel% == 1 (
     echo Failure: Current permissions inadequate.
     pause >nul
-	goto :eof
+    goto :eof
 )
 
 echo [*] Attempting to install '%s' certificate into Trusted Root store...
