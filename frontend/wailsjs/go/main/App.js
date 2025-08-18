@@ -6,8 +6,8 @@ export function CreateCA(arg1) {
   return window['go']['main']['App']['CreateCA'](arg1);
 }
 
-export function CreateCert(arg1, arg2, arg3) {
-  return window['go']['main']['App']['CreateCert'](arg1, arg2, arg3);
+export function CreateCert(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CreateCert'](arg1, arg2, arg3, arg4);
 }
 
 export function DeleteCA(arg1) {
@@ -16,6 +16,14 @@ export function DeleteCA(arg1) {
 
 export function DeleteCert(arg1) {
   return window['go']['main']['App']['DeleteCert'](arg1);
+}
+
+export function ExportToPFX(arg1, arg2) {
+  return window['go']['main']['App']['ExportToPFX'](arg1, arg2);
+}
+
+export function GenerateInstaller(arg1) {
+  return window['go']['main']['App']['GenerateInstaller'](arg1);
 }
 
 export function InspectCert(arg1) {
@@ -36,4 +44,8 @@ export function ListCAs() {
 
 export function ListCerts() {
   return window['go']['main']['App']['ListCerts']();
+}
+
+export function OpenOutputDir() {
+  return window['go']['main']['App']['OpenOutputDir']();
 }

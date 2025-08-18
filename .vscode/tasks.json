@@ -1,0 +1,32 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build with Wails",
+			"type": "shell",
+			"command": "wails build",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Run built ca-manager.exe",
+			"type": "shell",
+			"command": "build\\bin\\ca-manager.exe",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Build and Run ca-manager",
+			"type": "shell",
+			"command": "wails build && build\\bin\\ca-manager.exe",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}

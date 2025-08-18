@@ -15,10 +15,10 @@
         <div class="card card-inset">
             <div class="form-grid">
                 <input id="ca-country" placeholder="Country (GB)" type="text">
-                <input id="ca-state" placeholder="State (Scotland)" type="text">
-                <input id="ca-locality" placeholder="Locality (Jedburgh)" type="text">
+                <input id="ca-state" placeholder="State (The Scottish Borders)" type="text">
+                <input id="ca-locality" placeholder="Locality (Melrose)" type="text">
                 <input id="ca-org" placeholder="Organization (IQX Limited)" type="text">
-                <input id="ca-common" class="full-width" placeholder="* Common Name (e.g. IQX-CA)" type="text">
+                <input id="ca-common" class="full-width" placeholder="* Common Name (e.g. IQX Limited)" type="text">
             </div>
             <label for="ca-expiry">Expiry in Years:</label>
             <select id="ca-expiry" class="full-width"></select>
@@ -33,8 +33,16 @@
             <select id="ca-selector-device"></select>
             <button class="btn-delete" id="btn-delete-ca-device" title="Delete selected CA">X</button>
         </div>
-        <label for="cert-hostname">Device Hostname or IP Address:</label>
-        <input id="cert-hostname" placeholder="e.g., my-server or 192.168.1.50" type="text">
+        
+        <label for="cert-cn">Common Name (CN):</label>
+        <input id="cert-cn" placeholder="e.g., my-server, *.my-domain.local, or 192.168.1.50" type="text">
+
+        <label for="cert-sans-input">Additional Names (SANs):</label>
+        <div class="sans-container" id="sans-container">
+            <!-- Pills will be added here by JavaScript -->
+            <input id="cert-sans-input" placeholder="Type a name and press Enter, Tab, or Comma..." type="text">
+        </div>
+
         <label for="device-expiry">Expiry in Years:</label>
         <select id="device-expiry"></select>
         <button id="btn-create-cert">Create Certificate</button>
@@ -48,6 +56,7 @@
              <button class="btn-delete" id="btn-delete-ca-install" title="Delete selected CA">X</button>
         </div>
         <button id="btn-install-ca">Install Selected CA (Admin)</button>
+        <button id="btn-generate-installer" class="btn-secondary">Generate Installer</button>
     </div>
 
     <div class="card">
@@ -55,7 +64,10 @@
         <ul id="cert-list">
             <li>No certificates found.</li>
         </ul>
-        <button id="btn-refresh-certs">Refresh List</button>
+        <div class="card-footer">
+            <button id="btn-refresh-certs" class="btn-secondary">Refresh List</button>
+            <button id="btn-open-output" class="btn-secondary">Open Output Directory</button>
+        </div>
     </div>
 
     <details class="log-details">

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -8,6 +9,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"net"
@@ -15,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"software.sslmate.com/src/go-pkcs12"
 )
 
 // App struct
@@ -32,7 +35,7 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	// Create the output directory if it doesn't exist
 	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
-		os.Mkdir(outputDir, 0755)
+		os.MkdirAll(outputDir, 0755)
 	}
 }
 
@@ -104,10 +107,10 @@ func (a *App) CreateCA(input CAInput) string {
 			CommonName:   input.CommonName,
 		},
 		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(0, 0, input.ExpiryDays),
+		NotAfter:              time.Now().Add(time.Duration(input.ExpiryDays) * 24 * time.Hour),
 		IsCA:                  true,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign, // Removed CRLSign
 		BasicConstraintsValid: true,
 	}
 
@@ -138,60 +141,61 @@ func (a *App) CreateCA(input CAInput) string {
 	return fmt.Sprintf("Success! CA '%s' created in the 'output' folder.", input.CommonName)
 }
 
-// CreateCert generates a server/device certificate signed by a chosen CA.
-func (a *App) CreateCert(hostnameOrIP string, caName string, expiryDays int) string {
+// CreateCert generates a server/device certificate with a CN and SANs, signed by a chosen CA.
+func (a *App) CreateCert(cn string, sans string, caName string, expiryDays int) string {
 	if caName == "" {
 		return "Error: You must select a CA to sign the certificate with."
 	}
 	if expiryDays <= 0 {
 		expiryDays = 730 // Default to 2 years
 	}
-	if hostnameOrIP == "" {
-		return "Error: Hostname or IP address cannot be empty."
+	if cn == "" {
+		return "Error: Common Name (CN) cannot be empty."
 	}
 
-	caKeyPath := filepath.Join(outputDir, fmt.Sprintf("%s.key", caName))
-	caCertPath := filepath.Join(outputDir, fmt.Sprintf("%s.pem", caName))
-
-	if !fileExists(caKeyPath) || !fileExists(caCertPath) {
-		return fmt.Sprintf("Error: CA files for '%s' not found.", caName)
+	// The full list of SANs must include the CN
+	allSans := []string{cn}
+	if sans != "" {
+		sanList := strings.Split(sans, ",")
+		for _, s := range sanList {
+			trimmed := strings.TrimSpace(s)
+			if trimmed != "" {
+				// Avoid duplicates
+				isDuplicate := false
+				for _, existingSan := range allSans {
+					if existingSan == trimmed {
+						isDuplicate = true
+						break
+					}
+				}
+				if !isDuplicate {
+					allSans = append(allSans, trimmed)
+				}
+			}
+		}
 	}
 
-	caCertPEM, err := os.ReadFile(caCertPath)
+	caCert, caPrivateKey, err := loadCA(caName)
 	if err != nil {
-		return fmt.Sprintf("Error reading CA cert: %v", err)
-	}
-	pemBlock, _ := pem.Decode(caCertPEM)
-	caCert, err := x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		return fmt.Sprintf("Error parsing CA cert: %v", err)
-	}
-
-	caKeyPEM, err := os.ReadFile(caKeyPath)
-	if err != nil {
-		return fmt.Sprintf("Error reading CA key: %v", err)
-	}
-	pemBlock, _ = pem.Decode(caKeyPEM)
-	caPrivateKey, err := x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
-	if err != nil {
-		return fmt.Sprintf("Error parsing CA key: %v", err)
+		return fmt.Sprintf("Error loading CA: %v", err)
 	}
 
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(time.Now().Unix()),
-		Subject:      pkix.Name{CommonName: hostnameOrIP},
+		Subject:      pkix.Name{CommonName: cn},
 		NotBefore:    time.Now(),
 		NotAfter:     time.Now().AddDate(0, 0, expiryDays),
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 	}
 
-	// Check if the input is an IP address or a DNS name
-	ip := net.ParseIP(hostnameOrIP)
-	if ip != nil {
-		template.IPAddresses = []net.IP{ip}
-	} else {
-		template.DNSNames = []string{hostnameOrIP}
+	for _, san := range allSans {
+		ip := net.ParseIP(san)
+		if ip != nil {
+			template.IPAddresses = append(template.IPAddresses, ip)
+		} else {
+			template.DNSNames = append(template.DNSNames, san)
+		}
 	}
 
 	deviceKey, err := rsa.GenerateKey(rand.Reader, rsaBitsSrv)
@@ -204,8 +208,7 @@ func (a *App) CreateCert(hostnameOrIP string, caName string, expiryDays int) str
 		return fmt.Sprintf("Error signing device cert: %v", err)
 	}
 
-	// Sanitize filename for hostnames
-	safeFilename := strings.ReplaceAll(hostnameOrIP, "*", "_wildcard")
+	safeFilename := strings.ReplaceAll(cn, "*", "_wildcard")
 	deviceCertFile := filepath.Join(outputDir, fmt.Sprintf("%s_signed-by_%s.pem", safeFilename, caName))
 	deviceKeyFile := filepath.Join(outputDir, fmt.Sprintf("%s_signed-by_%s.key", safeFilename, caName))
 
@@ -223,7 +226,7 @@ func (a *App) CreateCert(hostnameOrIP string, caName string, expiryDays int) str
 	pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(deviceKey)})
 	keyOut.Close()
 
-	return fmt.Sprintf("Success! Certificate for %s created in the 'output' folder.", hostnameOrIP)
+	return fmt.Sprintf("Success! Certificate for %s created.", cn)
 }
 
 // ListCerts scans the output directory and returns a list of generated device .pem files.
@@ -252,13 +255,10 @@ func (a *App) DeleteCA(caName string) string {
 	caKeyPath := filepath.Join(outputDir, fmt.Sprintf("%s.key", caName))
 	caCertPath := filepath.Join(outputDir, fmt.Sprintf("%s.pem", caName))
 
-	errKey := os.Remove(caKeyPath)
-	errCert := os.Remove(caCertPath)
+	os.Remove(caKeyPath)
+	os.Remove(caCertPath)
 
-	if errKey != nil || errCert != nil {
-		return fmt.Sprintf("Error deleting files for CA '%s'. They may have already been removed.", caName)
-	}
-	return fmt.Sprintf("Success! CA '%s' has been deleted.", caName)
+	return fmt.Sprintf("Success! CA '%s' and all related files have been deleted.", caName)
 }
 
 // DeleteCert deletes the .pem and .key file for a given device certificate.
@@ -274,27 +274,16 @@ func (a *App) DeleteCert(certName string) string {
 	errKey := os.Remove(keyPath)
 
 	if errKey != nil || errCert != nil {
-		return fmt.Sprintf("Error deleting files for certificate '%s'. They may have already been removed.", certName)
+		return fmt.Sprintf("Error deleting files for certificate '%s'.", certName)
 	}
 	return fmt.Sprintf("Success! Certificate '%s' has been deleted.", certName)
 }
 
 // InspectCert reads a certificate file and returns its details.
 func (a *App) InspectCert(certName string) (*CertDetails, error) {
-	certPath := filepath.Join(outputDir, certName)
-	pemData, err := os.ReadFile(certPath)
+	cert, err := loadCert(certName)
 	if err != nil {
-		return nil, fmt.Errorf("could not read certificate file: %w", err)
-	}
-
-	pemBlock, _ := pem.Decode(pemData)
-	if pemBlock == nil {
-		return nil, fmt.Errorf("could not decode PEM block from certificate")
-	}
-
-	cert, err := x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse certificate: %w", err)
+		return nil, err
 	}
 
 	var ips []string
@@ -315,11 +304,179 @@ func (a *App) InspectCert(certName string) (*CertDetails, error) {
 	return details, nil
 }
 
-// Helper function to check if a file exists.
+// ExportToPFX exports a certificate and its key to a PFX/P12 file.
+func (a *App) ExportToPFX(certName string, password string) string {
+	// Load the device certificate
+	cert, err := loadCert(certName)
+	if err != nil {
+		return fmt.Sprintf("Error loading certificate '%s': %v", certName, err)
+	}
+
+	// Load the device's private key
+	keyPath := filepath.Join(outputDir, strings.TrimSuffix(certName, ".pem")+".key")
+	keyData, err := os.ReadFile(keyPath)
+	if err != nil {
+		return fmt.Sprintf("Error loading private key: %v", err)
+	}
+	keyBlock, _ := pem.Decode(keyData)
+	privateKey, err := x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
+	if err != nil {
+		return fmt.Sprintf("Error parsing private key: %v", err)
+	}
+
+	// Load the issuing CA to include in the chain
+	caCert, _, err := loadCA(cert.Issuer.CommonName)
+	if err != nil {
+		return fmt.Sprintf("Error loading issuing CA '%s': %v", cert.Issuer.CommonName, err)
+	}
+
+	// Create the PFX data using the sslmate package.
+	pfxData, err := pkcs12.Encode(rand.Reader, privateKey, cert, []*x509.Certificate{caCert}, password)
+	if err != nil {
+		return fmt.Sprintf("Error creating PFX file: %v", err)
+	}
+
+	// Save the PFX file
+	pfxPath := filepath.Join(outputDir, strings.TrimSuffix(certName, ".pem")+".pfx")
+	err = os.WriteFile(pfxPath, pfxData, 0644)
+	if err != nil {
+		return fmt.Sprintf("Error saving PFX file: %v", err)
+	}
+
+	return fmt.Sprintf("Success! Exported to '%s'.", pfxPath)
+}
+
+// GenerateInstaller creates a zip file with the CA cert and an installation script.
+func (a *App) GenerateInstaller(caName string) string {
+	if caName == "" {
+		return "Error: No CA selected to generate an installer for."
+	}
+
+	// Define paths
+	caCertPath := filepath.Join(outputDir, fmt.Sprintf("%s.pem", caName))
+	zipPath := filepath.Join(outputDir, fmt.Sprintf("%s_Installer.zip", caName))
+
+	// Check if the source certificate exists
+	if !fileExists(caCertPath) {
+		return fmt.Sprintf("Error: CA certificate for '%s' not found.", caName)
+	}
+
+	// Create the zip file
+	zipFile, err := os.Create(zipPath)
+	if err != nil {
+		return fmt.Sprintf("Error creating zip file: %v", err)
+	}
+	defer zipFile.Close()
+
+	zipWriter := zip.NewWriter(zipFile)
+	defer zipWriter.Close()
+
+	// Add the install script to the zip with the new, more reliable admin check and embedded filename
+	batchContent := fmt.Sprintf(`@echo off
+setlocal
+
+net session >nul 2>&1
+if %errorLevel% == 1 (
+    echo Failure: Current permissions inadequate.
+    pause >nul
+    goto :eof
+)
+
+echo [*] Attempting to install '%s' certificate into Trusted Root store...
+certutil.exe -addstore -f "ROOT" "%%~dp0%s.pem"
+
+echo.
+echo [*] Attempting to install '%s' certificate into Intermediate store...
+certutil.exe -addstore -f "CA" "%%~dp0%s.pem"
+
+echo.
+echo [INFO] Installation process complete. Check for errors above.
+pause
+endlocal`, caName, caName, caName, caName)
+
+	scriptWriter, err := zipWriter.Create("install-ca.bat")
+	if err != nil {
+		return fmt.Sprintf("Error adding batch script to zip: %v", err)
+	}
+	_, err = io.WriteString(scriptWriter, batchContent)
+	if err != nil {
+		return fmt.Sprintf("Error writing batch script content: %v", err)
+	}
+
+	// Add the CA certificate to the zip
+	certData, err := os.ReadFile(caCertPath)
+	if err != nil {
+		return fmt.Sprintf("Error reading CA certificate: %v", err)
+	}
+	certWriter, err := zipWriter.Create(fmt.Sprintf("%s.pem", caName))
+	if err != nil {
+		return fmt.Sprintf("Error adding certificate to zip: %v", err)
+	}
+	_, err = certWriter.Write(certData)
+	if err != nil {
+		return fmt.Sprintf("Error writing certificate content: %v", err)
+	}
+
+	return fmt.Sprintf("Success! Installer created at '%s'.", zipPath)
+}
+
+// OpenOutputDir opens the output directory in the system's file explorer.
+func (a *App) OpenOutputDir() string {
+	err := openDir(outputDir)
+	if err != nil {
+		return fmt.Sprintf("Error opening output directory: %v", err)
+	}
+	return "Success! Opened output directory."
+}
+
+
+// --- Helper Functions ---
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
 	if os.IsNotExist(err) {
 		return false
 	}
 	return !info.IsDir()
+}
+
+func loadCA(caName string) (*x509.Certificate, *rsa.PrivateKey, error) {
+	cert, err := loadCert(caName + ".pem")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	caKeyPath := filepath.Join(outputDir, fmt.Sprintf("%s.key", caName))
+	keyData, err := os.ReadFile(caKeyPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not read key file: %w", err)
+	}
+	keyBlock, _ := pem.Decode(keyData)
+	if keyBlock == nil {
+		return nil, nil, fmt.Errorf("could not decode PEM block from key")
+	}
+	privateKey, err := x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not parse private key: %w", err)
+	}
+
+	return cert, privateKey, nil
+}
+
+func loadCert(certFileName string) (*x509.Certificate, error) {
+	certPath := filepath.Join(outputDir, certFileName)
+	pemData, err := os.ReadFile(certPath)
+	if err != nil {
+		return nil, fmt.Errorf("could not read certificate file: %w", err)
+	}
+
+	pemBlock, _ := pem.Decode(pemData)
+	if pemBlock == nil {
+		return nil, fmt.Errorf("could not decode PEM block from certificate")
+	}
+
+	cert, err := x509.ParseCertificate(pemBlock.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse certificate: %w", err)
+	}
+	return cert, nil
 }
