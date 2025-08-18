@@ -23,3 +23,5 @@ export function IsAdmin():Promise<boolean>;
 export function ListCAs():Promise<Array<string>>;
 
 export function ListCerts():Promise<Array<string>>;
+
+export function OpenOutputDir():Promise<string>;

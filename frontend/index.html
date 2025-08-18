@@ -15,10 +15,10 @@
         <div class="card card-inset">
             <div class="form-grid">
                 <input id="ca-country" placeholder="Country (GB)" type="text">
-                <input id="ca-state" placeholder="State (Scotland)" type="text">
-                <input id="ca-locality" placeholder="Locality (Jedburgh)" type="text">
+                <input id="ca-state" placeholder="State (The Scottish Borders)" type="text">
+                <input id="ca-locality" placeholder="Locality (Melrose)" type="text">
                 <input id="ca-org" placeholder="Organization (IQX Limited)" type="text">
-                <input id="ca-common" class="full-width" placeholder="* Common Name (e.g. IQX-CA)" type="text">
+                <input id="ca-common" class="full-width" placeholder="* Common Name (e.g. IQX Limited)" type="text">
             </div>
             <label for="ca-expiry">Expiry in Years:</label>
             <select id="ca-expiry" class="full-width"></select>
@@ -64,7 +64,10 @@
         <ul id="cert-list">
             <li>No certificates found.</li>
         </ul>
-        <button id="btn-refresh-certs" class="btn-secondary">Refresh List</button>
+        <div class="card-footer">
+            <button id="btn-refresh-certs" class="btn-secondary">Refresh List</button>
+            <button id="btn-open-output" class="btn-secondary">Open Output Directory</button>
+        </div>
     </div>
 
     <details class="log-details">

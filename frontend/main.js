@@ -34,6 +34,7 @@ const btnGenerateInstaller = document.getElementById('btn-generate-installer');
 
 // Generated Certs section
 const btnRefreshCerts = document.getElementById('btn-refresh-certs');
+const btnOpenOutput = document.getElementById('btn-open-output');
 const certList = document.getElementById('cert-list');
 
 // Modal section
@@ -132,6 +133,13 @@ btnGenerateInstaller.addEventListener('click', () => {
 
 // Refresh device certificate list button
 btnRefreshCerts.addEventListener('click', refreshCertList);
+
+// Open output directory button
+btnOpenOutput.addEventListener('click', () => {
+    logMessage("Opening output directory...");
+    window.go.main.App.OpenOutputDir().then(handleResult);
+});
+
 
 // Delete CA buttons
 btnDeleteCaDevice.addEventListener('click', () => deleteCA(caSelectorDevice.value));

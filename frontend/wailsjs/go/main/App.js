@@ -45,3 +45,7 @@ export function ListCAs() {
 export function ListCerts() {
   return window['go']['main']['App']['ListCerts']();
 }
+
+export function OpenOutputDir() {
+  return window['go']['main']['App']['OpenOutputDir']();
+}

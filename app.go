@@ -379,13 +379,20 @@ net session >nul 2>&1
 if %%errorLevel%% == 1 (
     echo Failure: Current permissions inadequate.
     pause >nul
-) else (
-    echo [*] Attempting to install '%s' certificate...
-    certutil.exe -addstore -f "ROOT" "%%~dp0%s.pem"
-    echo.
-    pause
+	goto :eof
 )
-endlocal`, caName, caName)
+
+echo [*] Attempting to install '%s' certificate into Trusted Root store...
+certutil.exe -addstore -f "ROOT" "%%~dp0%s.pem"
+
+echo.
+echo [*] Attempting to install '%s' certificate into Intermediate store...
+certutil.exe -addstore -f "CA" "%%~dp0%s.pem"
+
+echo.
+echo [INFO] Installation process complete. Check for errors above.
+pause
+endlocal`, caName, caName, caName, caName)
 
 	scriptWriter, err := zipWriter.Create("install-ca.bat")
 	if err != nil {
@@ -411,6 +418,15 @@ endlocal`, caName, caName)
 	}
 
 	return fmt.Sprintf("Success! Installer created at '%s'.", zipPath)
+}
+
+// OpenOutputDir opens the output directory in the system's file explorer.
+func (a *App) OpenOutputDir() string {
+	err := openDir(outputDir)
+	if err != nil {
+		return fmt.Sprintf("Error opening output directory: %v", err)
+	}
+	return "Success! Opened output directory."
 }
 
 
