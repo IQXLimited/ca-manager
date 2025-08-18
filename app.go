@@ -376,7 +376,7 @@ func (a *App) GenerateInstaller(caName string) string {
 setlocal
 
 net session >nul 2>&1
-if %errorLevel% == 1 (
+if %%errorLevel%% == 1 (
     echo Failure: Current permissions inadequate.
     pause >nul
     goto :eof
