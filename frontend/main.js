@@ -23,6 +23,12 @@ const btnDeleteCaDevice = document.getElementById('btn-delete-ca-device');
 const sansContainer = document.getElementById('sans-container');
 const certSansInput = document.getElementById('cert-sans-input');
 
+// Sign CSR Section
+const btnSignCsr = document.getElementById('btn-sign-csr');
+const caSelectorCsr = document.getElementById('ca-selector-csr');
+const csrInput = document.getElementById('csr-input');
+const csrExpiry = document.getElementById('csr-expiry');
+
 
 // Install CA section
 const installCaSection = document.getElementById('install-ca-section');
@@ -67,7 +73,7 @@ btnCreateCA.addEventListener('click', () => {
     const caInput = {
         country: caCountry.value || "GB",
         state: caState.value || "Scotland",
-        locality: caLocality.value || "Jedburgh",
+        locality: caLocality.value || "Melrose",
         org: caOrg.value || "IQX Limited",
         commonName: caCommon.value,
         expiryDays: parseInt(caExpiry.value) * 365,
@@ -107,6 +113,33 @@ btnCreateCert.addEventListener('click', () => {
         })
         .then(refreshCertList);
 });
+
+// Sign CSR button
+btnSignCsr.addEventListener('click', () => {
+    const csr = csrInput.value;
+    const selectedCA = caSelectorCsr.value;
+    const expiry = parseInt(csrExpiry.value) * 365;
+
+    if (!csr) {
+        showToast("Please paste the CSR content.", "error");
+        return;
+    }
+    if (!selectedCA) {
+        showToast("Please select a CA to sign with.", "error");
+        return;
+    }
+
+    logMessage(`Signing CSR...`);
+    window.go.main.App.SignCSR(csr, selectedCA, expiry)
+        .then(result => {
+            handleResult(result);
+            if (result && result.toLowerCase().startsWith("success")) {
+                csrInput.value = '';
+            }
+        })
+        .then(refreshCertList);
+});
+
 
 // Install CA button
 btnInstallCA.addEventListener('click', () => {
@@ -291,10 +324,12 @@ function populateYearDropdowns() {
         const deviceOption = document.createElement('option');
         deviceOption.value = i;
         deviceOption.textContent = `${i} Year${i > 1 ? 's' : ''}`;
-        deviceExpiry.appendChild(deviceOption);
+        deviceExpiry.appendChild(deviceOption.cloneNode(true));
+        csrExpiry.appendChild(deviceOption);
     }
     caExpiry.value = 10;
     deviceExpiry.value = 2;
+    csrExpiry.value = 2;
 }
 
 // refreshCAList calls the Go backend to get the list of CAs and updates the dropdowns
@@ -303,18 +338,16 @@ function refreshCAList() {
     window.go.main.App.ListCAs().then(cas => {
         caSelectorDevice.innerHTML = '';
         caSelectorInstall.innerHTML = '';
+        caSelectorCsr.innerHTML = '';
 
         if (cas && cas.length > 0) {
             cas.forEach(caName => {
-                const option1 = document.createElement('option');
-                option1.value = caName;
-                option1.textContent = caName;
-                caSelectorDevice.appendChild(option1);
-
-                const option2 = document.createElement('option');
-                option2.value = caName;
-                option2.textContent = caName;
-                caSelectorInstall.appendChild(option2);
+                const option = document.createElement('option');
+                option.value = caName;
+                option.textContent = caName;
+                caSelectorDevice.appendChild(option.cloneNode(true));
+                caSelectorInstall.appendChild(option.cloneNode(true));
+                caSelectorCsr.appendChild(option);
             });
             logMessage("CA list updated.");
             createCADetails.open = false;

@@ -64,9 +64,16 @@ label {
     background-color: var(--bg-color);
 }
 
+.card-footer {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+}
+
 input[type="text"],
 input[type="number"],
-select {
+select,
+textarea {
     width: 100%;
     padding: 10px;
     margin-bottom: 15px;
@@ -79,7 +86,15 @@ select {
     box-sizing: border-box;
 }
 
-input:focus, select:focus {
+textarea {
+    resize: vertical;
+}
+
+#csr-input {
+    font-family: "Courier New", Courier, monospace;
+}
+
+input:focus, select:focus, textarea:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.3);
@@ -211,13 +226,7 @@ button:disabled {
 #cert-list {
     list-style-type: none;
     padding: 0;
-    margin: 0 0 15px 0;
-    max-height: 150px;
-    overflow-y: auto;
-    background-color: var(--bg-color);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    padding: 10px;
+    margin: 0;
 }
 
 #cert-list li {

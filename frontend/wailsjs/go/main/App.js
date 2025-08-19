@@ -49,3 +49,7 @@ export function ListCerts() {
 export function OpenOutputDir() {
   return window['go']['main']['App']['OpenOutputDir']();
 }
+
+export function SignCSR(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SignCSR'](arg1, arg2, arg3);
+}

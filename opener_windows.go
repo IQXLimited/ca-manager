@@ -14,6 +14,6 @@ func openDir(dir string) error {
 		return err
 	}
 	// Use "start" which is more reliable than calling explorer.exe directly
-	cmd := exec.Command("cmd", "/C", "start", absPath)
+	cmd := exec.Command("explorer", absPath)
 	return cmd.Run()
 }
