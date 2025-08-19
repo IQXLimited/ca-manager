@@ -25,3 +25,5 @@ export function ListCAs():Promise<Array<string>>;
 export function ListCerts():Promise<Array<string>>;
 
 export function OpenOutputDir():Promise<string>;
+
+export function SignCSR(arg1:string,arg2:string,arg3:number):Promise<string>;

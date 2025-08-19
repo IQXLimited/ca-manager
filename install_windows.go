@@ -18,13 +18,12 @@ import (
 const CERT_FRIENDLY_NAME_PROP_ID = 11
 
 // dataBlob is a local definition of the Windows DATA_BLOB structure.
-// This avoids potential version mismatches from the golang.org/x/sys/windows package.
 type dataBlob struct {
 	cbData uint32
 	pbData *byte
 }
 
-// InstallCA adds the selected CA certificate to the Windows "ROOT" certificate store.
+// InstallCA adds the selected CA certificate to the Windows "ROOT" and "CA" certificate stores.
 func (a *App) InstallCA(caName string) string {
 	if caName == "" {
 		return "Error: You must select a CA to install."
@@ -49,31 +48,43 @@ func (a *App) InstallCA(caName string) string {
 		return fmt.Sprintf("Error parsing certificate: %v", err)
 	}
 
-	// Open the system's "ROOT" certificate store using the windows package
+	// Install into both the ROOT and CA (Intermediate) stores
+	stores := []string{"ROOT", "CA"}
+	for _, storeName := range stores {
+		err := installCertInStore(cert, storeName)
+		if err != nil {
+			// Return on the first error, but it might have succeeded in the ROOT store.
+			return fmt.Sprintf("Error installing into '%s' store: %v", storeName, err)
+		}
+	}
+
+	return fmt.Sprintf("Success! CA Certificate '%s' installed in Windows. You may need to restart browsers.", caName)
+}
+
+// installCertInStore is a helper function to add a certificate to a specific system store.
+func installCertInStore(cert *x509.Certificate, storeName string) error {
 	store, err := windows.CertOpenStore(
 		windows.CERT_STORE_PROV_SYSTEM,
 		0,
 		0,
 		windows.CERT_SYSTEM_STORE_LOCAL_MACHINE,
-		uintptr(unsafe.Pointer(windows.StringToUTF16Ptr("ROOT"))),
+		uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(storeName))),
 	)
 	if err != nil {
-		return "Error: Failed to open certificate store. Please run this application as an Administrator."
+		return fmt.Errorf("failed to open certificate store. Please run as Administrator")
 	}
 	defer windows.CertCloseStore(store, 0)
 
-	// Create a certificate context from our certificate data
 	certContext, err := windows.CertCreateCertificateContext(
 		windows.X509_ASN_ENCODING|windows.PKCS_7_ASN_ENCODING,
 		&cert.Raw[0],
 		uint32(len(cert.Raw)),
 	)
 	if err != nil {
-		return fmt.Sprintf("Error creating certificate context: %v", err)
+		return fmt.Errorf("failed to create certificate context: %w", err)
 	}
 	defer windows.CertFreeCertificateContext(certContext)
 
-	// Add the certificate context to the store, getting a handle to the newly added cert
 	var newCertContext *windows.CertContext
 	err = windows.CertAddCertificateContextToStore(
 		store,
@@ -82,52 +93,44 @@ func (a *App) InstallCA(caName string) string {
 		&newCertContext,
 	)
 	if err != nil {
-		return "Error: Failed to add certificate to store. Please ensure you are running as an Administrator."
+		return fmt.Errorf("failed to add certificate to store: %w", err)
 	}
 
 	// If we got a handle to the new cert, set its friendly name
 	if newCertContext != nil {
 		defer windows.CertFreeCertificateContext(newCertContext)
 
-		// Create the friendly name string
 		var friendlyNameBase string
 		if len(cert.Subject.Organization) > 0 {
 			friendlyNameBase = cert.Subject.Organization[0]
 		} else {
-			friendlyNameBase = cert.Subject.CommonName // Fallback to common name
+			friendlyNameBase = cert.Subject.CommonName
 		}
 		friendlyName := fmt.Sprintf("%s Signing Root", friendlyNameBase)
 
-		// Convert to the required Windows format (UTF-16 blob)
 		friendlyNamePtr, err := windows.UTF16PtrFromString(friendlyName)
 		if err != nil {
-			return "Error: Could not create friendly name string for Windows."
+			return fmt.Errorf("could not create friendly name string for Windows")
 		}
 
-		// Use our local, stable struct definition
 		blob := dataBlob{
 			cbData: uint32(len(friendlyName)+1) * 2,
 			pbData: (*byte)(unsafe.Pointer(friendlyNamePtr)),
 		}
-		
-		// Dynamically load the function from crypt32.dll
-		crypt32 := windows.NewLazySystemDLL("crypt32.dll")
-        procCertSetCertificateContextProperty := crypt32.NewProc("CertSetCertificateContextProperty")
 
-		// Set the property on the certificate in the store
+		crypt32 := windows.NewLazySystemDLL("crypt32.dll")
+		procCertSetCertificateContextProperty := crypt32.NewProc("CertSetCertificateContextProperty")
+
 		ret, _, err := procCertSetCertificateContextProperty.Call(
 			uintptr(unsafe.Pointer(newCertContext)),
 			CERT_FRIENDLY_NAME_PROP_ID,
 			0,
 			uintptr(unsafe.Pointer(&blob)),
 		)
-		
-		// A return value of 0 indicates failure.
+
 		if ret == 0 {
-			// This is not a critical error, so we just log it and continue
-			log.Printf("Warning: Could not set friendly name on certificate: %v", err)
+			log.Printf("Warning: Could not set friendly name on certificate in '%s' store: %v", storeName, err)
 		}
 	}
-
-	return fmt.Sprintf("Success! CA Certificate '%s' installed in Windows. You may need to restart browsers.", caName)
+	return nil
 }

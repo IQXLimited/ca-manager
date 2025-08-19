@@ -47,6 +47,17 @@
         <select id="device-expiry"></select>
         <button id="btn-create-cert">Create Certificate</button>
     </div>
+
+    <div class="card">
+        <h2>Sign Certificate Request (CSR)</h2>
+        <label for="ca-selector-csr">Sign with CA:</label>
+        <select id="ca-selector-csr"></select>
+        <label for="csr-input">Paste CSR Content:</label>
+        <textarea id="csr-input" placeholder="-----BEGIN CERTIFICATE REQUEST-----&#10;...&#10;-----END CERTIFICATE REQUEST-----" rows="5"></textarea>
+        <label for="csr-expiry">Expiry in Years:</label>
+        <select id="csr-expiry"></select>
+        <button id="btn-sign-csr">Sign CSR</button>
+    </div>
     
     <div class="card" id="install-ca-section">
         <h2>Install CA in Windows</h2>

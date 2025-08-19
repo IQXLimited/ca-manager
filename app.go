@@ -135,7 +135,12 @@ func (a *App) CreateCA(input CAInput) string {
 	if err != nil {
 		return fmt.Sprintf("Error saving CA key: %v", err)
 	}
-	pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privateKey)})
+	// Marshal to PKCS#8 for modern compatibility
+	pkcs8Bytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return fmt.Sprintf("Error converting key to PKCS#8: %v", err)
+	}
+	pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: pkcs8Bytes})
 	keyOut.Close()
 
 	return fmt.Sprintf("Success! CA '%s' created in the 'output' folder.", input.CommonName)
@@ -223,11 +228,110 @@ func (a *App) CreateCert(cn string, sans string, caName string, expiryDays int) 
 	if err != nil {
 		return fmt.Sprintf("Error saving device key: %v", err)
 	}
-	pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(deviceKey)})
+	// Marshal to PKCS#8 for modern compatibility
+	pkcs8Bytes, err := x509.MarshalPKCS8PrivateKey(deviceKey)
+	if err != nil {
+		return fmt.Sprintf("Error converting key to PKCS#8: %v", err)
+	}
+	pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: pkcs8Bytes})
 	keyOut.Close()
 
 	return fmt.Sprintf("Success! Certificate for %s created.", cn)
 }
+
+// SignCSR signs a Certificate Signing Request and saves the private key if provided.
+func (a *App) SignCSR(pastedText string, caName string, expiryDays int) string {
+	if caName == "" {
+		return "Error: You must select a CA to sign the request with."
+	}
+	if expiryDays <= 0 {
+		expiryDays = 730 // Default to 2 years
+	}
+	if pastedText == "" {
+		return "Error: Pasted text cannot be empty."
+	}
+
+	// Find and separate CSR and Private Key from the pasted text
+	var csrBlock, keyBlock *pem.Block
+	rest := []byte(pastedText)
+	for {
+		var block *pem.Block
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		if block.Type == "CERTIFICATE REQUEST" {
+			csrBlock = block
+		} else if strings.Contains(block.Type, "PRIVATE KEY") {
+			keyBlock = block
+		}
+	}
+
+	if csrBlock == nil {
+		return "Error: No valid CSR found in the pasted text."
+	}
+
+	csr, err := x509.ParseCertificateRequest(csrBlock.Bytes)
+	if err != nil {
+		return fmt.Sprintf("Error parsing CSR: %v", err)
+	}
+
+	if err := csr.CheckSignature(); err != nil {
+		return fmt.Sprintf("Error verifying CSR signature: %v", err)
+	}
+
+	caCert, caPrivateKey, err := loadCA(caName)
+	if err != nil {
+		return fmt.Sprintf("Error loading CA: %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber:    big.NewInt(time.Now().Unix()),
+		Subject:         csr.Subject,
+		DNSNames:        csr.DNSNames,
+		IPAddresses:     csr.IPAddresses,
+		EmailAddresses:  csr.EmailAddresses,
+		NotBefore:       time.Now(),
+		NotAfter:        time.Now().AddDate(0, 0, expiryDays),
+		KeyUsage:        x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+	}
+
+	certBytes, err := x509.CreateCertificate(rand.Reader, template, caCert, csr.PublicKey, caPrivateKey)
+	if err != nil {
+		return fmt.Sprintf("Error signing certificate from CSR: %v", err)
+	}
+
+	cn := csr.Subject.CommonName
+	if cn == "" {
+		cn = "signed_cert" // Fallback filename
+	}
+	safeFilename := strings.ReplaceAll(cn, "*", "_wildcard")
+	
+	// Save the signed certificate
+	certFile := filepath.Join(outputDir, fmt.Sprintf("%s_signed-by_%s.pem", safeFilename, caName))
+	certOut, err := os.Create(certFile)
+	if err != nil {
+		return fmt.Sprintf("Error saving signed certificate: %v", err)
+	}
+	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
+	certOut.Close()
+
+	// If a private key was also pasted, save it with a matching name
+	if keyBlock != nil {
+		keyFile := filepath.Join(outputDir, fmt.Sprintf("%s_signed-by_%s.key", safeFilename, caName))
+		keyOut, err := os.OpenFile(keyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		if err != nil {
+			return fmt.Sprintf("Success! Certificate for %s signed. However, failed to save private key: %v", cn, err)
+		}
+		pem.Encode(keyOut, keyBlock)
+		keyOut.Close()
+		return fmt.Sprintf("Success! Certificate for %s signed and private key was saved.", cn)
+	}
+
+	return fmt.Sprintf("Success! Certificate for %s signed and created.", cn)
+}
+
 
 // ListCerts scans the output directory and returns a list of generated device .pem files.
 func (a *App) ListCerts() []string {
@@ -319,7 +423,7 @@ func (a *App) ExportToPFX(certName string, password string) string {
 		return fmt.Sprintf("Error loading private key: %v", err)
 	}
 	keyBlock, _ := pem.Decode(keyData)
-	privateKey, err := x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
+	privateKey, err := parsePrivateKey(keyBlock.Bytes)
 	if err != nil {
 		return fmt.Sprintf("Error parsing private key: %v", err)
 	}
@@ -376,10 +480,10 @@ func (a *App) GenerateInstaller(caName string) string {
 setlocal
 
 net session >nul 2>&1
-if %errorLevel% == 1 (
+if %%errorLevel%% == 1 (
     echo Failure: Current permissions inadequate.
     pause >nul
-    goto :eof
+	goto :eof
 )
 
 echo [*] Attempting to install '%s' certificate into Trusted Root store...
@@ -420,15 +524,10 @@ endlocal`, caName, caName, caName, caName)
 	return fmt.Sprintf("Success! Installer created at '%s'.", zipPath)
 }
 
-// OpenOutputDir opens the output directory in the system's file explorer.
 func (a *App) OpenOutputDir() string {
-	err := openDir(outputDir)
-	if err != nil {
-		return fmt.Sprintf("Error opening output directory: %v", err)
-	}
-	return "Success! Opened output directory."
+	openDir(outputDir)
+	return fmt.Sprintf("")
 }
-
 
 // --- Helper Functions ---
 func fileExists(filename string) bool {
@@ -437,6 +536,22 @@ func fileExists(filename string) bool {
 		return false
 	}
 	return !info.IsDir()
+}
+
+func parsePrivateKey(derBytes []byte) (*rsa.PrivateKey, error) {
+	// Try PKCS#8 first
+	if key, err := x509.ParsePKCS8PrivateKey(derBytes); err == nil {
+		rsaKey, ok := key.(*rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("key is not an RSA private key")
+		}
+		return rsaKey, nil
+	}
+	// Then try PKCS#1
+	if key, err := x509.ParsePKCS1PrivateKey(derBytes); err == nil {
+		return key, nil
+	}
+	return nil, fmt.Errorf("failed to parse private key: unsupported format")
 }
 
 func loadCA(caName string) (*x509.Certificate, *rsa.PrivateKey, error) {
@@ -454,7 +569,7 @@ func loadCA(caName string) (*x509.Certificate, *rsa.PrivateKey, error) {
 	if keyBlock == nil {
 		return nil, nil, fmt.Errorf("could not decode PEM block from key")
 	}
-	privateKey, err := x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
+	privateKey, err := parsePrivateKey(keyBlock.Bytes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not parse private key: %w", err)
 	}
